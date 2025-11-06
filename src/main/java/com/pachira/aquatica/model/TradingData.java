@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 
 /**
@@ -33,7 +34,7 @@ public class TradingData {
             return BigDecimal.ZERO;
         }
         return price.subtract(open)
-                .divide(open, 4, BigDecimal.ROUND_HALF_UP)
+                .divide(open, 4, RoundingMode.HALF_UP)
                 .multiply(new BigDecimal("100"));
     }
 }

@@ -29,7 +29,6 @@ class TradingDataServiceTest {
         
         assertNotNull(allData);
         assertFalse(allData.isEmpty());
-        assertTrue(allData.size() > 0);
     }
 
     @Test
