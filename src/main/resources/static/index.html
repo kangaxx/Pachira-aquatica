@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pachira Aquatica - Real-time Trading Data</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .subtitle {
+            color: rgba(255,255,255,0.9);
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        
+        .summary {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .summary h2 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        
+        .summary-item {
+            text-align: center;
+            padding: 10px;
+            background: #f7f7f7;
+            border-radius: 5px;
+        }
+        
+        .summary-label {
+            font-size: 0.85em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .summary-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .trading-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .trading-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .trading-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+        
+        .symbol {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .price {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .price.positive {
+            color: #22c55e;
+        }
+        
+        .price.negative {
+            color: #ef4444;
+        }
+        
+        .price.neutral {
+            color: #6b7280;
+        }
+        
+        .change {
+            font-size: 0.9em;
+            margin-bottom: 15px;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            font-size: 0.85em;
+            color: #666;
+        }
+        
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .stat-label {
+            font-weight: 500;
+        }
+        
+        .timestamp {
+            text-align: center;
+            color: rgba(255,255,255,0.8);
+            margin-top: 20px;
+            font-size: 0.9em;
+        }
+        
+        .status {
+            text-align: center;
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 20px;
+            padding: 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 5px;
+        }
+        
+        .status.connected {
+            background: rgba(34, 197, 94, 0.3);
+        }
+        
+        .status.disconnected {
+            background: rgba(239, 68, 68, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌳 Pachira Aquatica</h1>
+        <p class="subtitle">Real-time Quantitative Trading Data Platform</p>
+        
+        <div class="status" id="status">Connecting to server...</div>
+        
+        <div class="summary" id="summary">
+            <h2>Market Summary</h2>
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <div class="summary-label">Total Symbols</div>
+                    <div class="summary-value" id="total-symbols">-</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">Advancers</div>
+                    <div class="summary-value" style="color: #22c55e" id="advancers">-</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">Decliners</div>
+                    <div class="summary-value" style="color: #ef4444" id="decliners">-</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">Unchanged</div>
+                    <div class="summary-value" id="unchanged">-</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="trading-grid" id="trading-grid"></div>
+        
+        <div class="timestamp" id="timestamp"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    <script>
+        let stompClient = null;
+        const tradingData = {};
+
+        function setStatus(message, connected) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = connected ? 'status connected' : 'status disconnected';
+        }
+
+        function connect() {
+            const socket = new SockJS('/ws-trading');
+            stompClient = Stomp.over(socket);
+            
+            stompClient.connect({}, function (frame) {
+                setStatus('✓ Connected - Real-time updates active', true);
+                console.log('Connected: ' + frame);
+                
+                // Subscribe to market summary
+                stompClient.subscribe('/topic/market-summary', function (message) {
+                    const summary = JSON.parse(message.body);
+                    updateMarketSummary(summary);
+                });
+                
+                // Subscribe to individual trading symbols
+                loadInitialData();
+            }, function(error) {
+                setStatus('✗ Disconnected - Attempting to reconnect...', false);
+                setTimeout(connect, 5000);
+            });
+        }
+
+        function loadInitialData() {
+            fetch('/api/v1/trading/data')
+                .then(response => response.json())
+                .then(data => {
+                    data.forEach(item => {
+                        tradingData[item.symbol] = item;
+                        subscribeToSymbol(item.symbol);
+                    });
+                    renderTradingGrid();
+                })
+                .catch(error => console.error('Error loading initial data:', error));
+        }
+
+        function subscribeToSymbol(symbol) {
+            stompClient.subscribe('/topic/trading/' + symbol, function (message) {
+                const data = JSON.parse(message.body);
+                tradingData[data.symbol] = data;
+                updateTradingCard(data);
+            });
+        }
+
+        function updateMarketSummary(summary) {
+            document.getElementById('total-symbols').textContent = summary.totalSymbols;
+            document.getElementById('advancers').textContent = summary.advancers;
+            document.getElementById('decliners').textContent = summary.decliners;
+            document.getElementById('unchanged').textContent = summary.unchanged;
+        }
+
+        function renderTradingGrid() {
+            const grid = document.getElementById('trading-grid');
+            grid.innerHTML = '';
+            
+            Object.values(tradingData).forEach(data => {
+                grid.appendChild(createTradingCard(data));
+            });
+        }
+
+        function createTradingCard(data) {
+            const card = document.createElement('div');
+            card.className = 'trading-card';
+            card.id = 'card-' + data.symbol;
+            
+            const changePercent = calculateChangePercent(data);
+            const priceClass = changePercent > 0 ? 'positive' : changePercent < 0 ? 'negative' : 'neutral';
+            const changeSymbol = changePercent > 0 ? '+' : '';
+            
+            card.innerHTML = `
+                <div class="symbol">${data.symbol}</div>
+                <div class="price ${priceClass}">$${parseFloat(data.price).toFixed(2)}</div>
+                <div class="change ${priceClass}">${changeSymbol}${changePercent.toFixed(2)}%</div>
+                <div class="stats">
+                    <div class="stat-row">
+                        <span class="stat-label">High:</span>
+                        <span>$${parseFloat(data.high).toFixed(2)}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Low:</span>
+                        <span>$${parseFloat(data.low).toFixed(2)}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Open:</span>
+                        <span>$${parseFloat(data.open).toFixed(2)}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Volume:</span>
+                        <span>${formatVolume(data.volume)}</span>
+                    </div>
+                </div>
+            `;
+            
+            return card;
+        }
+
+        function updateTradingCard(data) {
+            const card = document.getElementById('card-' + data.symbol);
+            if (card) {
+                const changePercent = calculateChangePercent(data);
+                const priceClass = changePercent > 0 ? 'positive' : changePercent < 0 ? 'negative' : 'neutral';
+                const changeSymbol = changePercent > 0 ? '+' : '';
+                
+                card.innerHTML = `
+                    <div class="symbol">${data.symbol}</div>
+                    <div class="price ${priceClass}">$${parseFloat(data.price).toFixed(2)}</div>
+                    <div class="change ${priceClass}">${changeSymbol}${changePercent.toFixed(2)}%</div>
+                    <div class="stats">
+                        <div class="stat-row">
+                            <span class="stat-label">High:</span>
+                            <span>$${parseFloat(data.high).toFixed(2)}</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Low:</span>
+                            <span>$${parseFloat(data.low).toFixed(2)}</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Open:</span>
+                            <span>$${parseFloat(data.open).toFixed(2)}</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Volume:</span>
+                            <span>${formatVolume(data.volume)}</span>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            updateTimestamp();
+        }
+
+        function calculateChangePercent(data) {
+            if (data.open === 0) return 0;
+            return ((data.price - data.open) / data.open) * 100;
+        }
+
+        function formatVolume(volume) {
+            const num = parseFloat(volume);
+            if (num >= 1000000) {
+                return (num / 1000000).toFixed(2) + 'M';
+            } else if (num >= 1000) {
+                return (num / 1000).toFixed(2) + 'K';
+            }
+            return num.toFixed(0);
+        }
+
+        function updateTimestamp() {
+            const now = new Date();
+            document.getElementById('timestamp').textContent = 
+                'Last updated: ' + now.toLocaleTimeString();
+        }
+
+        // Connect on page load
+        connect();
+        
+        // Update timestamp every second
+        setInterval(updateTimestamp, 1000);
+    </script>
+</body>
+</html>
