@@ -8,6 +8,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
@@ -23,11 +24,23 @@ public class KLineService {
     private final Random random = new Random();
 
     /**
-     * 每分钟生成一个随机K线数据
+     * 每分钟生成一个随机K线数据（仅在交易时间9:00-15:00生成）
      */
     @Scheduled(cron = "0 * * * * ?") // 每分钟的第0秒执行
     public void generateKLine() {
         LocalDateTime now = LocalDateTime.now();
+        
+        // 检查是否在交易时间内（9:00-15:00）
+        int hour = now.getHour();
+        if (hour < 9 || hour >= 15) {
+            // 非交易时间，不生成数据
+            return;
+        }
+        
+        // 如果是9点整，重置当前价格为初始价格
+        if (hour == 9 && now.getMinute() == 0) {
+            currentPrice = 100.0;
+        }
         
         // 随机生成K线数据
         double open = currentPrice;
@@ -50,6 +63,25 @@ public class KLineService {
         currentPrice = close;
         
         System.out.println("Generated KLine: " + kLine.getTime() + " - Open: " + kLine.getOpen() + ", High: " + kLine.getHigh() + ", Low: " + kLine.getLow() + ", Close: " + kLine.getClose() + ", Volume: " + kLine.getVolume());
+    }
+
+    /**
+     * 获取当天9点到当前时间的K线数据
+     */
+    public List<KLine> getTodayKLines() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime today9AM = now.withHour(9).withMinute(0).withSecond(0).withNano(0);
+        
+        List<KLine> allKLines = kLineRepository.findAll();
+        List<KLine> todayKLines = new ArrayList<>();
+        
+        for (KLine kLine : allKLines) {
+            if (kLine.getTime().isAfter(today9AM) && kLine.getTime().isBefore(now)) {
+                todayKLines.add(kLine);
+            }
+        }
+        
+        return todayKLines;
     }
 
     /**

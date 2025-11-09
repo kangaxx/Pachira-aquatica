@@ -29,12 +29,12 @@ public class WebSocketController {
     }
 
     /**
-     * 客户端请求获取历史K线数据
+     * 客户端请求获取历史K线数据（返回当天9点到当前时间的数据）
      */
     @MessageMapping("/history")
     @SendTo("/topic/history")
     public List<KLineViewModel> getHistory() {
-        return KLineConverter.toViewModelList(kLineService.getAllKLines());
+        return KLineConverter.toViewModelList(kLineService.getTodayKLines());
     }
 
     /**
